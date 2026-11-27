@@ -1,0 +1,62 @@
+name: Build Kivy Termux Test APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip \
+            build-essential autoconf automake libtool \
+            pkg-config zlib1g-dev libncurses5-dev \
+            libffi-dev libssl-dev libltdl-dev cmake
+
+      - name: Install Buildozer
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install buildozer Cython==0.29.36
+
+      - name: Extract project
+        run: |
+          ZIP_FILE=$(find . -maxdepth 1 -name "Kivy_Termux_Test_App.zip" -type f | head -n 1)
+          test -n "$ZIP_FILE"
+          mkdir extracted
+          unzip -q "$ZIP_FILE" -d extracted
+          test -f extracted/buildozer.spec
+          echo "PROJECT_DIR=extracted" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          buildozer android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kivy-Termux-Test-APK
+          path: extracted/bin/*.apk
+          if-no-files-found: error
+          
